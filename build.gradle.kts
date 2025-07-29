@@ -35,6 +35,7 @@ dependencies {
 	implementation("org.telegram:telegrambots-springboot-longpolling-starter:9.0.0")
 	implementation("org.telegram:telegrambots-meta:9.0.0")
 
+	implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
 	compileOnly("org.projectlombok:lombok")
 	annotationProcessor("org.projectlombok:lombok")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
