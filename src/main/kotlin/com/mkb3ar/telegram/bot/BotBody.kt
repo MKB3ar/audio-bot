@@ -1,5 +1,8 @@
 package com.mkb3ar.telegram.bot
 
+import com.mkb3ar.telegram.entity.User
+import com.mkb3ar.telegram.repository.UserRepository
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient
@@ -21,6 +24,10 @@ class BotBody(
 
     private val telegramClient: TelegramClient = OkHttpTelegramClient(token)
 
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
+
     override fun getBotToken(): String {
         return token
     }
@@ -39,7 +46,9 @@ class BotBody(
                 .text(text)
                 .chatId(chatID)
                 .build()
+            val user = User("1", chatID, update.message.chat.firstName, update.message.chat.lastName, update.message.chat.userName)
             try {
+                userRepository.save(user)
                 telegramClient.execute(sender)
             } catch (e: TelegramApiException){
                 e.printStackTrace()
