@@ -4,8 +4,13 @@ import com.mkb3ar.telegram.entity.User
 import com.mkb3ar.telegram.repository.UserDataRepository
 import com.mkb3ar.telegram.repository.UserRepository
 import org.springframework.stereotype.Service
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto
+import org.telegram.telegrambots.meta.api.methods.send.SendVoice
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery
+import org.telegram.telegrambots.meta.api.objects.InputFile
 import org.telegram.telegrambots.meta.api.objects.chat.Chat
 import org.telegram.telegrambots.meta.api.objects.message.Message
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup
@@ -13,6 +18,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 import org.telegram.telegrambots.meta.generics.TelegramClient
+import java.io.File as JavaFile
 
 @Service
 class BotCommandHandler(
@@ -137,6 +143,83 @@ class BotCommandHandler(
             telegramClient.execute(message)
         } catch (e: TelegramApiException){
             e.printStackTrace()
+        }
+    }
+
+
+
+    private fun sendMp3AsVoice(chat: Chat, mp3FilePath: String) {
+        try {
+            val sendVoice = SendVoice.builder()
+                .chatId(chat.id)
+                .voice(InputFile(JavaFile(mp3FilePath)))
+                .build()
+            telegramClient.execute(sendVoice)
+            println("Тестовая отправка MP3 как голосового сообщения выполнена для файла: $mp3FilePath")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            botMediaHandler.sendReply(chat, "Произошла ошибка при попытке отправить файл как голосовое сообщение.")
+        }
+    }
+
+    fun handleCallbackQuery(callbackQuery: CallbackQuery) {
+        val data = callbackQuery.data
+        val chat = callbackQuery.message.chat
+        val user = callbackQuery.from
+        telegramClient.execute(AnswerCallbackQuery(callbackQuery.id))
+        when {
+            data.startsWith("file_") -> {
+                val fileIndex = data.substringAfter("file_").toIntOrNull() ?: return
+
+                val listenButton = InlineKeyboardButton.builder()
+                    .text("🎧 Прослушать")
+                    .callbackData("listen_$fileIndex")
+                    .build()
+
+                val textButton = InlineKeyboardButton.builder()
+                    .text("📄 Получить текст")
+                    .callbackData("text_$fileIndex")
+                    .build()
+
+                val keyboardMarkup = InlineKeyboardMarkup.builder()
+                    .keyboardRow(InlineKeyboardRow(listenButton, textButton))
+                    .build()
+
+                val editMessage = EditMessageText.builder()
+                    .chatId(chat.id)
+                    .messageId(callbackQuery.message.messageId)
+                    .text("Выберите действие для файла:")
+                    .replyMarkup(keyboardMarkup)
+                    .build()
+
+                try {
+                    telegramClient.execute(editMessage)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            data.startsWith("listen_") -> {
+                val fileIndex = data.substringAfter("listen_").toIntOrNull() ?: return
+
+                val dbUserOptional = userRepository.findById(user.id)
+                if (dbUserOptional.isEmpty) return
+                val userFiles = userDataRepository.findUserDataByUser(dbUserOptional.get())
+
+                if (fileIndex < userFiles.size) {
+                    val userData = userFiles[fileIndex]
+                    sendMp3AsVoice(chat, userData.filePath)
+                }
+            }
+
+            data.startsWith("text_") -> {
+                val answer = AnswerCallbackQuery.builder()
+                    .callbackQueryId(callbackQuery.id)
+                    .text("Функция получения текста находится в разработке.")
+                    .showAlert(true)
+                    .build()
+                telegramClient.execute(answer)
+            }
         }
     }
 }
