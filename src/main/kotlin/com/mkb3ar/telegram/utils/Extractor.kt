@@ -7,10 +7,11 @@ class Extractor {
     fun extractAudio(inputVideoPath: String, outputAudioPath: String): Boolean{
         val ffmpegCommand = listOf(
             "ffmpeg",
-            "-i", inputVideoPath,
-            "-vn",
-            "-acodec", "copy",
-            outputAudioPath
+            "-i", inputVideoPath,    // Входной файл
+            "-vn",                   // Убрать видеопоток (no video)
+            "-c:a", "libmp3lame",    // Явно указываем кодек для аудио (-c:a это синоним -acodec)
+            "-q:a", "2",             // Устанавливаем качество (VBR), где 0 - лучшее, 9 - худшее. 2 - очень хорошо.
+            outputAudioPath          // Выходной файл
         )
         try {
             val process = ProcessBuilder(ffmpegCommand)
