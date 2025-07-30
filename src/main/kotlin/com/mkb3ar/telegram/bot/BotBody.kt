@@ -13,6 +13,7 @@ import org.telegram.telegrambots.meta.api.objects.Update
 class BotBody(
     @Value("\${telegram.bot.token}") private val token: String,
     private val botCommandHandler: BotCommandHandler,
+    private val botMediaHandler: BotMediaHandler,
 ) : LongPollingSingleThreadUpdateConsumer, SpringLongPollingBot {
 
     override fun getBotToken(): String = token
@@ -21,18 +22,26 @@ class BotBody(
 
     override fun consume(update: Update) {
         // Проверяем, есть ли в обновлении сообщение с текстом
-        if (update.hasMessage() && update.message.hasText()) {
+        if (update.hasMessage()){
             val message = update.message
-            val messageText = message.text
             val chat = message.chat
-
-            // Обрабатываем только команды, начинающиеся с "/"
-            if (messageText.startsWith("/")) {
-                when (messageText.split(" ")[0]) {
-                    "/start" -> botCommandHandler.handleStartCommand(chat)
-                    "/cat" -> botCommandHandler.handlePhotoCommand(chat, "https://cataas.com/cat")
-                    else -> botCommandHandler.handleUnknownCommand(chat)
+            if(update.message.hasText()) {
+                val messageText = message.text
+                if (messageText.startsWith("/")) {
+                    when (messageText.split(" ")[0]) {
+                        "/start" -> botCommandHandler.handleStartCommand(chat)
+                        "/cat" -> botCommandHandler.handlePhotoCommand(chat, "https://cataas.com/cat")
+                        else -> botCommandHandler.handleUnknownCommand(chat)
+                    }
+                } else {
+                    botCommandHandler.handleUnknownCommand(chat)
                 }
+            } else if (update.message.hasVideo()){
+                botMediaHandler.saveVideo(chat, message.video)
+            } else if (update.message.hasAudio()){
+                botMediaHandler.saveAudio(chat, message.audio)
+            } else if (update.message.hasVoice()){
+                botMediaHandler.saveVoice(chat, message.voice)
             } else {
                 botCommandHandler.handleUnknownCommand(chat)
             }
