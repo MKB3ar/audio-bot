@@ -1,5 +1,6 @@
 package com.mkb3ar.telegram.bot
 
+import com.mkb3ar.telegram.utils.PendingFileService
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.longpolling.BotSession
@@ -13,7 +14,7 @@ import org.telegram.telegrambots.meta.api.objects.Update
 class BotBody(
     @Value("\${telegram.bot.token}") private val token: String,
     private val botCommandHandler: BotCommandHandler,
-    private val botMediaHandler: BotMediaHandler,
+    private val pendingFileService: PendingFileService
 ) : LongPollingSingleThreadUpdateConsumer, SpringLongPollingBot {
 
     override fun getBotToken(): String = token
@@ -21,28 +22,38 @@ class BotBody(
     override fun getUpdatesConsumer(): LongPollingUpdateConsumer = this
 
     override fun consume(update: Update) {
-        // Проверяем, есть ли в обновлении сообщение с текстом
         if (update.hasMessage()){
             val message = update.message
             val chat = message.chat
-            if(update.message.hasText()) {
-                val messageText = message.text
-                if (messageText.startsWith("/")) {
-                    when (messageText.split(" ")[0]) {
-                        "/start" -> botCommandHandler.handleStartCommand(chat)
-                        "/cat" -> botCommandHandler.handlePhotoCommand(chat, "https://cataas.com/cat")
-                        else -> botCommandHandler.handleUnknownCommand(chat)
-                    }
+            val originalFileMessage = pendingFileService.getAndRemovePendingFile(chat.id)
+            if (originalFileMessage != null) {
+                if (message.hasText()) {
+                    val userFileName = message.text
+                    botCommandHandler.handleFile(originalFileMessage, userFileName)
+                    return
                 } else {
-                    botCommandHandler.handleUnknownCommand(chat)
+                    pendingFileService.setPendingFile(chat.id, originalFileMessage)
+                    botCommandHandler.handleReplyCommand(message, "Пожалуйста, введите название для файла именно текстом.")
+                    return
                 }
-            } else if (update.message.hasVideo()){
-                botMediaHandler.saveVideo(chat, message.video)
-            } else if (update.message.hasAudio()){
-                botMediaHandler.saveAudio(chat, message.audio)
-            } else if (update.message.hasVoice()){
-                botMediaHandler.saveVoice(chat, message.voice)
-            } else {
+            }
+
+            else if (update.message.hasVideo() || update.message.hasAudio() || update.message.hasVoice()){
+                pendingFileService.setPendingFile(chat.id, message)
+                botCommandHandler.handleReplyCommand(message, "Отлично! Как назовем этот файл?")
+                return
+            }
+
+            else if(update.message.hasText() && message.text.startsWith("/")) {
+                when (message.text.split(" ")[0]) {
+                    "/start" -> botCommandHandler.handleStartCommand(chat)
+                    "/cat" -> botCommandHandler.handlePhotoCommand(chat, "https://cataas.com/cat")
+                    "/check" -> botCommandHandler.handleCheckCommand(chat)
+                    else -> botCommandHandler.handleUnknownCommand(chat)
+                }
+                return
+            }
+            else {
                 botCommandHandler.handleUnknownCommand(chat)
             }
         }
