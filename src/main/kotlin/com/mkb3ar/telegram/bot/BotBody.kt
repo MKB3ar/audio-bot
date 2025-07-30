@@ -22,6 +22,10 @@ class BotBody(
     override fun getUpdatesConsumer(): LongPollingUpdateConsumer = this
 
     override fun consume(update: Update) {
+        if (update.hasCallbackQuery()) {
+            botCommandHandler.handleCallbackQuery(update.callbackQuery)
+            return
+        }
         if (update.hasMessage()){
             val message = update.message
             val chat = message.chat
@@ -43,7 +47,6 @@ class BotBody(
                 botCommandHandler.handleReplyCommand(message, "Отлично! Как назовем этот файл?")
                 return
             }
-
             else if(update.message.hasText() && message.text.startsWith("/")) {
                 when (message.text.split(" ")[0]) {
                     "/start" -> botCommandHandler.handleStartCommand(chat)
