@@ -3,7 +3,8 @@ package com.mkb3ar.telegram.entity
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.mapping.DBRef
 import org.springframework.data.mongodb.core.mapping.Document
-import java.time.Instant
+import java.time.LocalDateTime
+
 
 @Document(value = "user_data")
 data class UserData(
@@ -11,5 +12,5 @@ data class UserData(
     @DBRef val user: User,
     val userFileName: String,
     val filePath: String,
-    val createdAt: Instant = Instant.now()
+    val createdAt: LocalDateTime? = LocalDateTime.now()
 )
