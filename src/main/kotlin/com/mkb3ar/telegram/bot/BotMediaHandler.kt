@@ -28,7 +28,8 @@ class BotMediaHandler(
     private val extractor: Extractor,
     private val userDataRepository: UserDataRepository,
     private val userRepository: UserRepository,
-    @Value("\${telegram.bot.token}") private val token: String
+    @Value("\${telegram.bot.token}") private val token: String,
+    @Value("\${app.base-dir}") private val baseDir: String
 ) {
     fun photoFromURL(path: String): InputFile {
         val response: ResponseEntity<ByteArray> = RestClient.create()
@@ -46,24 +47,40 @@ class BotMediaHandler(
         var tempVideoFile: Path? = null
         try {
             sendReply(chat, "Получил видео. Начинаю обработку аудио.")
+
+            // Скачиваем содержимое видео
             val videoFile: File = telegramClient.execute(GetFile(video.fileId))
             val videoFileBytes = RestClient
-                .create()
+                .create() // Обратите внимание на проблему с таймаутом, которую мы обсуждали
                 .get()
                 .uri(videoFile.getFileUrl(token))
                 .retrieve()
                 .body(ByteArray::class.java)
+
             if (videoFileBytes == null) {
                 sendReply(chat, "Не удалось скачать видеофайл.")
                 return
             }
-            tempVideoFile = Files.createTempFile("video_", ".${videoFile.filePath?.substringAfterLast('.') ?: "mp4"}")
-            if (tempVideoFile != null) {
-                Files.write(tempVideoFile, videoFileBytes)
-            }
-            val outputDir = Paths.get("uploads/${chat.id}", "audio")
+
+            // Создаем путь к директории для временных файлов
+            val tempDir = Paths.get(baseDir, chat.id.toString())
+            Files.createDirectories(tempDir)
+
+            val prefix = "video_"
+            val suffix = ".${videoFile.filePath?.substringAfterLast('.') ?: "mp4"}"
+
+            // Создаем пустой временный файл
+            tempVideoFile = Files.createTempFile(tempDir, prefix, suffix)
+
+            // --- ВОТ НЕДОСТАЮЩАЯ СТРОКА ---
+            // Записываем скачанные данные в созданный временный файл
+            Files.write(tempVideoFile, videoFileBytes)
+            // ------------------------------
+
+            // Теперь передаем в extractor файл, который уже содержит данные
+            val outputDir = Paths.get(baseDir, chat.id.toString(), "audio")
             Files.createDirectories(outputDir)
-            val outputAudioPath = outputDir.resolve("${chat.id}_${System.currentTimeMillis()}.mp3")
+            val outputAudioPath = outputDir.resolve("$fileName.mp3")
 
             val success = extractor.extractAudio(tempVideoFile.toString(), outputAudioPath.toString())
 
@@ -101,7 +118,7 @@ class BotMediaHandler(
                 .retrieve()
                 .body(ByteArray::class.java)
 
-            val uploadDir = Paths.get("uploads/${chat.id}", "audio") // Создаем подпапку для каждого типа контента и для каждого пользователя
+            val uploadDir = Paths.get(baseDir + "${chat.id}", "audio") // Создаем подпапку для каждого типа контента и для каждого пользователя
             Files.createDirectories(uploadDir)
             val savePath = uploadDir.resolve("${chat.id}_${System.currentTimeMillis()}.mp3")
             if (fileByte != null) {

@@ -1,6 +1,8 @@
 package com.mkb3ar.telegram.bot
 
+import com.mkb3ar.telegram.dto.UserDataDTO
 import com.mkb3ar.telegram.entity.User
+import com.mkb3ar.telegram.kafka.KafkaProducerService
 import com.mkb3ar.telegram.repository.UserDataRepository
 import com.mkb3ar.telegram.repository.UserRepository
 import org.springframework.stereotype.Service
@@ -25,7 +27,8 @@ class BotCommandHandler(
     private val telegramClient: TelegramClient,
     private val userRepository: UserRepository,
     private val botMediaHandler: BotMediaHandler,
-    private val userDataRepository: UserDataRepository
+    private val userDataRepository: UserDataRepository,
+    private val kafkaProducerService: KafkaProducerService
 ){
     fun handleUnknownCommand(chat: Chat) {
         val messageText = "Я не знаю такой команды. Введите /start, чтобы увидеть список моих возможностей."
@@ -146,8 +149,6 @@ class BotCommandHandler(
         }
     }
 
-
-
     private fun sendMp3AsVoice(chat: Chat, mp3FilePath: String) {
         try {
             val sendVoice = SendVoice.builder()
@@ -212,13 +213,35 @@ class BotCommandHandler(
                 }
             }
 
+            // НОВАЯ ЛОГИКА
             data.startsWith("text_") -> {
-                val answer = AnswerCallbackQuery.builder()
-                    .callbackQueryId(callbackQuery.id)
-                    .text("Функция получения текста находится в разработке.")
-                    .showAlert(true)
-                    .build()
-                telegramClient.execute(answer)
+                try {
+                    val fileIndex = data.substringAfter("text_").toIntOrNull() ?: return
+
+                    // Получаем информацию о файле по индексу
+                    val dbUserOptional = userRepository.findById(user.id)
+                    if (dbUserOptional.isEmpty) return
+                    val userFiles = userDataRepository.findUserDataByUser(dbUserOptional.get())
+
+                    if (fileIndex < userFiles.size) {
+                        val userData = userFiles[fileIndex]
+
+                        // 1. Создаем DTO с необходимой информацией
+                        val request = UserDataDTO(
+                            chatID = chat.id,
+                            userFileName = userData.userFileName,
+                            filePath = userData.filePath
+                        )
+                        // 2. Отправляем DTO в Kafka через наш сервис
+                        kafkaProducerService.sendFileToProcess(request)
+
+                        // 3. Сообщаем пользователю, что запрос принят
+                        botMediaHandler.sendReply(chat, "✅ Запрос на получение текста из файла '${userData.userFileName}' отправлен в обработку.")
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    botMediaHandler.sendReply(chat, "Произошла ошибка при отправке запроса на обработку.")
+                }
             }
         }
     }
