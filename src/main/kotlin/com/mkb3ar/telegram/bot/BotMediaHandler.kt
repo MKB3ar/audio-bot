@@ -42,7 +42,6 @@ class BotMediaHandler(
 
     fun saveAudio(chat: Chat, audio: Audio, fileName: String) = saveMediaFile(chat, audio.fileId, fileName)
     fun saveVoice(chat: Chat, voice: Voice,fileName: String) = saveMediaFile(chat, voice.fileId, fileName)
-
     fun saveVideo(chat: Chat, video: Video, fileName: String) {
         var tempVideoFile: Path? = null
         try {
@@ -117,18 +116,18 @@ class BotMediaHandler(
         }
     }
 
-    private fun sendReply(chat: Chat, text: String) {
+    private fun saveUserData(chat: Chat, userFileName: String, filePath: String){
+        val user: User = userRepository.findUserById(chat.id)
+        val userData = UserData(user = user, userFileName = userFileName, filePath = filePath)
+        userDataRepository.save(userData)
+    }
+
+    fun sendReply(chat: Chat, text: String) {
         val message = SendMessage(chat.id.toString(), text)
         try {
             telegramClient.execute(message)
         } catch (e: TelegramApiException) {
             e.printStackTrace()
         }
-    }
-
-    private fun saveUserData(chat: Chat, userFileName: String, filePath: String){
-        val user: User = userRepository.findUserById(chat.id)
-        val userData = UserData(user = user, userFileName = userFileName, filePath = filePath)
-        userDataRepository.save(userData)
     }
 }
