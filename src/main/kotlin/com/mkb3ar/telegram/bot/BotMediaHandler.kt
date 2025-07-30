@@ -1,5 +1,9 @@
 package com.mkb3ar.telegram.bot
 
+import com.mkb3ar.telegram.entity.User
+import com.mkb3ar.telegram.entity.UserData
+import com.mkb3ar.telegram.repository.UserDataRepository
+import com.mkb3ar.telegram.repository.UserRepository
 import com.mkb3ar.telegram.utils.Extractor
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.MediaType
@@ -22,6 +26,8 @@ import java.nio.file.Paths
 class BotMediaHandler(
     private val telegramClient: TelegramClient,
     private val extractor: Extractor,
+    private val userDataRepository: UserDataRepository,
+    private val userRepository: UserRepository,
     @Value("\${telegram.bot.token}") private val token: String
 ) {
     fun photoFromURL(path: String): InputFile {
@@ -34,10 +40,10 @@ class BotMediaHandler(
         return InputFile(ByteArrayInputStream(response.body), path + System.currentTimeMillis() + ".jpg")
     }
 
-    fun saveAudio(chat: Chat, audio: Audio) = saveMediaFile(chat, audio.fileId)
-    fun saveVoice(chat: Chat, voice: Voice) = saveMediaFile(chat, voice.fileId)
+    fun saveAudio(chat: Chat, audio: Audio, fileName: String) = saveMediaFile(chat, audio.fileId, fileName)
+    fun saveVoice(chat: Chat, voice: Voice,fileName: String) = saveMediaFile(chat, voice.fileId, fileName)
 
-    fun saveVideo(chat: Chat, video: Video) {
+    fun saveVideo(chat: Chat, video: Video, fileName: String) {
         var tempVideoFile: Path? = null
         try {
             sendReply(chat, "Получил видео. Начинаю обработку аудио.")
@@ -64,6 +70,7 @@ class BotMediaHandler(
 
             if (success) {
                 sendReply(chat, "Аудиодорожка успешно извлечена и сохранена!")
+                saveUserData(chat, fileName, outputAudioPath.toString())
                 println("Аудио сохранено в: $outputAudioPath")
             } else {
                 sendReply(chat, "Не удалось извлечь аудиодорожку из видео.")
@@ -84,7 +91,7 @@ class BotMediaHandler(
         }
     }
 
-    private fun saveMediaFile(chat: Chat, fileID: String){
+    private fun saveMediaFile(chat: Chat, fileID: String, fileName: String){
         sendReply(chat, "Процесс сохранения файла успешно запущен.")
         try{
             val file: File = telegramClient.execute(GetFile(fileID))
@@ -102,6 +109,7 @@ class BotMediaHandler(
                 Files.write(savePath, fileByte)
             }
             println("Файл успешно сохранен: $savePath")
+            saveUserData(chat, fileName, savePath.toString())
             sendReply(chat, "Файл был успешно сохранен.")
         } catch (e: Exception) {
             e.printStackTrace()
@@ -116,5 +124,11 @@ class BotMediaHandler(
         } catch (e: TelegramApiException) {
             e.printStackTrace()
         }
+    }
+
+    private fun saveUserData(chat: Chat, userFileName: String, filePath: String){
+        val user: User = userRepository.findUserById(chat.id)
+        val userData = UserData(user = user, userFileName = userFileName, filePath = filePath)
+        userDataRepository.save(userData)
     }
 }
