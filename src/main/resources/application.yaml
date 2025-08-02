@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: "telegram"
+  data:
+    mongodb:
+      username: admin
+      password: admin
+      database: telegram-bot
+      authentication-database: admin
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://admin:admin@localhost:27017/telegram-bot?authSource=admin}
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: default
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.value.default.type: com.mkb3ar.telegram.dto.DoneUserdataDTO
+
+
+
+kafka:
+  topic:
+    process: "process"
+    done: "done"
+
+app:
+  base-dir: '../data/uploads/'
