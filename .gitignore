@@ -40,7 +40,7 @@ out/
 *.kotlin
 
 ### Yaml ###
-*.yaml
+application.yaml
 
 ### files ###
 files/
