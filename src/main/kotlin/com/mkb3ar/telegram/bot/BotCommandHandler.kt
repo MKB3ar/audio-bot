@@ -44,10 +44,9 @@ class BotCommandHandler(
         }
     }
     fun handleStartCommand(chat: Chat) {
-        // Сохраняем пользователя, только если он новый
         if (!userRepository.existsById(chat.id)) {
             val user = User(
-                id = chat.id, // Используем telegram ID в качестве уникального ID документа
+                id = chat.id,
                 firstName = chat.firstName,
                 lastName = chat.lastName,
                 userName = chat.userName
@@ -56,10 +55,17 @@ class BotCommandHandler(
         }
 
         val welcomeText = """
-        Привет, ${chat.firstName}! Я бот, который очень любит котиков 😻
+        Привет, ${chat.firstName}! Я твой личный помощник для хранения и расшифровки аудио 🤖
+        
+        **Как это работает:**
+        1.  **Отправь мне аудио, голосовое или видеофайл.** Я автоматически извлеку из него аудиодорожку.
+        2.  **Дай файлу имя.** Сразу после отправки я спрошу, как назвать файл. Просто ответь мне текстом.
+        3.  **Управляй файлами.** Используй команду `/check`, чтобы увидеть список всех твоих файлов. Из этого списка ты сможешь прослушать аудио или получить его полную текстовую расшифровку.
         
         **Доступные команды:**
-        /cat - прислать случайную фотографию котика
+        `/check` - Показать все твои файлы, прослушать их или получить текст.
+        `/start` - Показать это приветственное сообщение.
+        `/cat` - Прислать фото котика (потому что все любят котиков 😻).
         """.trimIndent()
 
         val sendMessage = SendMessage.builder()
@@ -148,21 +154,6 @@ class BotCommandHandler(
             e.printStackTrace()
         }
     }
-
-    private fun sendMp3AsVoice(chat: Chat, mp3FilePath: String) {
-        try {
-            val sendVoice = SendVoice.builder()
-                .chatId(chat.id)
-                .voice(InputFile(JavaFile(mp3FilePath)))
-                .build()
-            telegramClient.execute(sendVoice)
-            println("Тестовая отправка MP3 как голосового сообщения выполнена для файла: $mp3FilePath")
-        } catch (e: Exception) {
-            e.printStackTrace()
-            botMediaHandler.sendReply(chat, "Произошла ошибка при попытке отправить файл как голосовое сообщение.")
-        }
-    }
-
     fun handleCallbackQuery(callbackQuery: CallbackQuery) {
         val data = callbackQuery.data
         val chat = callbackQuery.message.chat
@@ -243,6 +234,19 @@ class BotCommandHandler(
                     botMediaHandler.sendReply(chat, "Произошла ошибка при отправке запроса на обработку.")
                 }
             }
+        }
+    }
+    private fun sendMp3AsVoice(chat: Chat, mp3FilePath: String) {
+        try {
+            val sendVoice = SendVoice.builder()
+                .chatId(chat.id)
+                .voice(InputFile(JavaFile(mp3FilePath)))
+                .build()
+            telegramClient.execute(sendVoice)
+            println("Тестовая отправка MP3 как голосового сообщения выполнена для файла: $mp3FilePath")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            botMediaHandler.sendReply(chat, "Произошла ошибка при попытке отправить файл как голосовое сообщение.")
         }
     }
 }
